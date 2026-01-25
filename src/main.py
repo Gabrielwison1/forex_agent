@@ -176,4 +176,6 @@ def main():
                 time.sleep(60)
 
 if __name__ == "__main__":
+    from src.database.models import init_db
+    init_db()
     main()
