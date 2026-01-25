@@ -81,10 +81,34 @@ def run_agent_cycle():
                       f"{exec_result.get('lot_size')} lots @ {exec_result.get('entry_price')}")
                 print(f"  Order ID: {exec_result.get('order_id')}")
             else:
+                # --- PROFESSIONAL OBSERVABILITY UPGRADE ---
                 reason = result.get('execution_result', {}).get('reason', 'No setup found')
                 print(f"✗ No trade: {reason}")
+                
+                # Save Reasoning to DB even if no trade
+                from src.database.models import Trade, SessionLocal
+                
+                try:
+                    db = SessionLocal()
+                    wait_log = Trade(
+                        pair="EURUSD",
+                        action="WAIT",
+                        entry_price=initial_state["technical_indicators"]["Current_Price"],
+                        stop_loss=0.0,
+                        take_profit=0.0,
+                        lot_size=0.0,
+                        status="NONE",
+                        reasoning_trace=result.get("reasoning_trace", [])
+                    )
+                    db.add(wait_log)
+                    db.commit()
+                    db.close()
+                    print("  (Reasoning saved to War Room)")
+                except Exception as e:
+                    print(f"  (DB Log Error: {e})")
             
             return True # Success
+            
             
         except Exception as e:
             error_str = str(e)

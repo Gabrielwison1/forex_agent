@@ -121,6 +121,17 @@ def app():
             
         st.markdown(f'<div class="trade-log">{content}</div>', unsafe_allow_html=True)
 
-    # Auto-refresh
+    # Auto-refresh logic (Every 30 seconds)
+    import time
+    
     if st.button("Refresh Monitor"):
+        st.rerun()
+        
+    # Simple auto-refresh ticker
+    time.sleep(1) # Small delay to prevent CPU spinning
+    if "last_refresh" not in st.session_state:
+        st.session_state.last_refresh = time.time()
+    
+    if time.time() - st.session_state.last_refresh > 30:
+        st.session_state.last_refresh = time.time()
         st.rerun()
