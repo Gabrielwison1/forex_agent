@@ -148,6 +148,10 @@ def check_password():
 
     if "auth_state" not in st.session_state:
         st.session_state["auth_state"] = "login"
+        
+    # Auto-login if session param exists (Simple Persistence)
+    if "session" in st.query_params and not st.session_state.get("password_correct"):
+        st.session_state["password_correct"] = True
 
     # Layout: Use empty columns to center content
     col1, col2, col3 = st.columns([1.5, 2, 1.5])
@@ -177,6 +181,8 @@ def check_password():
                     
                     if secrets.compare_digest(input_hash, stored_hash):
                         st.session_state["password_correct"] = True
+                        # Persistent Session (Professional Fix)
+                        st.query_params["session"] = secrets.token_hex(8)
                         st.balloons()
                         time.sleep(0.5)
                         st.rerun()
