@@ -149,7 +149,7 @@ def main():
                 from src.database.models import Heartbeat, SessionLocal
                 try:
                     db = SessionLocal()
-                    hb = Heartbeat(status="ACTIVE", last_message=f"Cycle starting for {pair}")
+                    hb = Heartbeat(status="ACTIVE", last_message="Cycle starting for EURUSD")
                     db.add(hb)
                     db.commit()
                     db.close()
