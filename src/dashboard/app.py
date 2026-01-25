@@ -2,6 +2,10 @@ import streamlit as st
 from src.dashboard.auth import check_password, logout
 from src.dashboard import dashboard as live_monitor
 from src.dashboard.views import settings, admin
+from src.database.models import init_db # Import for auto-setup
+
+# Ensure database tables exist (Critical for Cloud cold-starts)
+init_db()
 
 st.set_page_config(layout="wide", page_title="Premium FX Agent", page_icon="🦅")
 
