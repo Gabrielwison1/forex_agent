@@ -3,7 +3,6 @@ langchain
 langchain_openai
 langchain-google-genai
 google-generativeai
-pyparsing<3.0.0
 pydantic
 psycopg2-binary
 sqlalchemy
@@ -11,8 +10,7 @@ v20
 python-dotenv
 streamlit
 plotly
-langchain-google-genai
-langchain
 langchain_core
 langchain_community
 pandas
+numpy
