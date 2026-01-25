@@ -1,6 +1,8 @@
 import streamlit as st
 import os
 import time
+import hashlib
+import secrets
 from dotenv import load_dotenv
 from src.dashboard.utils import verify_master_key, update_admin_password
 
@@ -169,8 +171,11 @@ def check_password():
             with b1:
                 if st.button("Authenticate", type="primary", use_container_width=True):
                     load_dotenv(override=True)
-                    correct = os.getenv("ADMIN_PASSWORD", "admin")
-                    if pwd == correct:
+                    # Verify Hash
+                    stored_hash = os.getenv("ADMIN_PASSWORD_HASH", "")
+                    input_hash = hashlib.sha256(pwd.strip().encode()).hexdigest()
+                    
+                    if secrets.compare_digest(input_hash, stored_hash):
                         st.session_state["password_correct"] = True
                         st.balloons()
                         time.sleep(0.5)

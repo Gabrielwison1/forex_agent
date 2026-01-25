@@ -12,48 +12,43 @@ RUN_INTERVAL_MINUTES = 15  # Increased to 15m to respect Gemini Free Tier limits
 RUN_ONCE = False  # Set to False for continuous loop
 
 def fetch_live_market_data():
-    """Fetch real-time market data from OANDA."""
+    """Fetch real-time market data from OANDA (Deep History)."""
     client = OandaClient()
     
     # Fetch current price
     price = client.get_current_price("EUR_USD")
     
-    # Fetch candles for different timeframes
+    # --- LIGHTWEIGHT MODE (Rate Limit Safe) ---
+    # Fetch just enough for calculation
     h1_candles = client.get_candles("EUR_USD", granularity="H1", count=20)
     m15_candles = client.get_candles("EUR_USD", granularity="M15", count=20)
-    m5_candles = client.get_candles("EUR_USD", granularity="M5", count=10)
     
-    # Simple technical indicators (placeholder - in production use TA-Lib)
-    h1_closes = [c['close'] for c in h1_candles[-5:]]
-    m15_closes = [c['close'] for c in m15_candles[-5:]]
+    # Calculate simple indicators locally to save tokens
+    h1_closes = [c['close'] for c in h1_candles]
+    current_close = h1_closes[-1]
+    prev_close = h1_closes[-2]
     
-    # Format for AI consumption
+    # Simple Trend Logic (Mock TA)
+    trend = "BULLISH" if current_close > h1_closes[0] else "BEARISH"
+    momentum = "UP" if current_close > prev_close else "DOWN"
+    
     return {
         "technical_indicators": {
-            "1H_EMA_Cross": "BULLISH" if h1_closes[-1] > h1_closes[0] else "BEARISH",
-            "1H_RSI": 55,  # Placeholder
-            "ATR": 0.0015,
-            "Key_Levels": {"Resistance": max(h1_closes), "Support": min(h1_closes)},
-            "15M_Technicals": {
-                "Structure": "Higher Highs" if m15_closes[-1] > m15_closes[0] else "Lower Lows",
-                "Order_Block": f"Level at {m15_closes[-2]:.5f}",
-                "FVG": "Gap detected" if abs(m15_closes[-1] - m15_closes[-2]) > 0.0010 else "No gap"
-            },
-            "5M_Technicals": {
-                "RSI": 50,  # Placeholder
-                "Candle_Pattern": "Analyzing...",
-                "Current_Price": price['bid']
-            }
+            "Mode": "Lightweight_calculated",
+            "H1_Trend": trend,
+            "H1_Momentum": momentum,
+            "Current_Price": price.get('bid', 0.0),
+            "H1_Close": current_close,
+            "H1_Low": min(h1_closes),
+            "H1_High": max(h1_closes)
         },
         "macro_sentiment": {
-            "News_Headlines_Summary": "Live market conditions",
-            "AI_Sentiment_Score": 60,
-            "Event_Calendar": "No High Impact events"
+            "News_Summary": "Live market conditions",
+            "Sentiment_Score": 60,
         },
         "risk_environment": {
-            "VIX_Index": 15,
-            "Average_Spread": abs(price['ask'] - price['bid']),
-            "DXY_Correlation": 0.85
+            "VIX": 15,
+            "Spread": abs(price.get('ask', 0.0) - price.get('bid', 0.0)),
         },
         "reasoning_trace": []
     }
@@ -67,27 +62,42 @@ def run_agent_cycle():
     
     print("Running AI Analysis Chain...")
     
-    try:
-        result = graph.invoke(initial_state)
-        
-        print(f"\nBias: {result.get('current_bias')} | "
-              f"Structure: {result.get('market_structure')} | "
-              f"Decision: {result.get('trade_decision')}")
-        
-        if result.get('execution_result', {}).get('executed'):
-            exec_result = result['execution_result']
-            print(f"✓ TRADE EXECUTED: {exec_result.get('action')} "
-                  f"{exec_result.get('lot_size')} lots @ {exec_result.get('entry_price')}")
-            print(f"  Order ID: {exec_result.get('order_id')}")
-        else:
-            reason = result.get('execution_result', {}).get('reason', 'No setup found')
-            print(f"✗ No trade: {reason}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
+    # Smart Retry Logic for Free Tier Limits
+    max_retries = 3
+    retry_delay = 30 # Initial delay
+    
+    for attempt in range(max_retries):
+        try:
+            result = graph.invoke(initial_state)
+            
+            # --- SUCCESS PROCESSING ---
+            print(f"\nBias: {result.get('current_bias')} | "
+                  f"Structure: {result.get('market_structure')} | "
+                  f"Decision: {result.get('trade_decision')}")
+            
+            if result.get('execution_result', {}).get('executed'):
+                exec_result = result['execution_result']
+                print(f"✓ TRADE EXECUTED: {exec_result.get('action')} "
+                      f"{exec_result.get('lot_size')} lots @ {exec_result.get('entry_price')}")
+                print(f"  Order ID: {exec_result.get('order_id')}")
+            else:
+                reason = result.get('execution_result', {}).get('reason', 'No setup found')
+                print(f"✗ No trade: {reason}")
+            
+            return True # Success
+            
+        except Exception as e:
+            error_str = str(e)
+            if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
+                print(f"⚠️ Rate Limit Hit (Attempt {attempt+1}/{max_retries}). Waiting {retry_delay}s...")
+                time.sleep(retry_delay)
+                retry_delay *= 2 # Exponential backoff
+            else:
+                print(f"Error: {e}")
+                return False
+                
+    print("❌ Failed after max retries. API Quota likely exhausted for the day.")
+    return False
 
 def main():
     """Main entry point for the trading agent."""

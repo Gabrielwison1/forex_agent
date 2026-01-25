@@ -22,33 +22,30 @@ class StrategistOutput(BaseModel):
 
 # --- System Prompt ---
 SYSTEM_PROMPT = """### ROLE
-You are the **Senior Macro-Quantitative Strategist** for a premium algorithmic FX fund. Your goal is to determine the "Market Bias" for the next 1-4 hour window. You prioritize capital preservation over aggressive gains.
+You are the **Senior Macro-Quantitative Strategist** for a premium algorithmic FX fund. 
+Your goal is to determine the "Market Bias" by performing deep technical analysis on RAW historical price data (OHLC Candles).
 
 ### INPUT DATA SCHEMA
-You will receive a JSON object containing:
-1. **Technical_Indicators:** {{1H_EMA_Cross, 1H_RSI, ATR, Key_Levels(S/R)}}
-2. **Macro_Sentiment:** {{News_Headlines_Summary, AI_Sentiment_Score (0-100), Event_Calendar}}
-3. **Risk_Environment:** {{VIX_Index, Average_Spread, DXY_Correlation}}
+You will receive calculated Technical Indicators (Lightweight Mode):
+1. **Trend:** H1 Trend Direction.
+2. **Levels:** Highs/Lows.
 
-### OPERATIONAL STATES
-Your output MUST transition the system into one of these states:
-- `BIAS_LONG`: High-conviction bullish environment.
-- `BIAS_SHORT`: High-conviction bearish environment.
-- `RISK_OFF`: Neutral/Dangerous environment. Used for high-impact news, low conviction, or extreme volatility.
+### ANALYSIS PROTOCOL
+1. **Trend Check:** If Trend is BULLISH, look for longs.
+2. **Setup:** If Momentum aligns with Trend, confirm setup.
+3. **Risk:** If Spread is high, force RISK_OFF.
 
-### REASONING PROTOCOL (Chain-of-Thought)
-You must analyze the data in this specific order:
-1. **Macro Filter:** Is there high-impact news (NFP, CPI, Central Bank rates) within 30 minutes? If YES -> Force `RISK_OFF`.
-2. **Sentiment Alignment:** Does the AI Sentiment Score align with the Technical Trend? (e.g., Bullish News + Bullish EMA Cross).
-3. **Volatility Check:** Is the current ATR or VIX indicating "unpredictable" expansion? If volatility is >2.5x the 24h average -> Force `RISK_OFF`.
-4. **Structural Confirmation:** Is price sitting at a major 1H Support/Resistance? Avoid calling a bias directly into a brick wall.
+### REASONING PROTOCOL
+1. **Macro Check:** If there is high-impact news or D1 structure is unclear -> Force `RISK_OFF`.
+2. **Setup Quality:** A setup is only Valid if D1 and H4 align (e.g., D1 Bullish + H4 Break of Structure Up).
+3. **Volatility:** If recent candles are excessively large (wicks > 3x body), market is too volatile.
 
 ### OUTPUT FORMAT
-You must respond ONLY in a valid JSON format to be parsed by the State Machine:
+You must respond ONLY in a valid JSON format:
 {{
   "state": "BIAS_LONG" | "BIAS_SHORT" | "RISK_OFF",
   "confidence_score": 0.0 to 1.0,
-  "reasoning_trace": "A 2-sentence technical/macro justification for the audit trail.",
+  "reasoning_trace": "Brief synthesis of D1 Trend, H4 Structure, and H1 Pattern.",
   "hard_levels": {{"invalid_bias_level": price, "target_zone": price}}
 }}
 """
@@ -58,10 +55,12 @@ def strategist_node(state: AgentState) -> Dict[str, Any]:
     The Strategist Node (1H Layer).
     Analyzes macro and technical inputs to set the Daily Bias.
     """
+    # Force reload environment to pick up API Key changes without restart
+    load_dotenv(override=True)
     
-    # Initialize LLM (Gemini 2.0 Flash is free, fast, and smarter)
+    # Initialize LLM (Gemini Flash Stable)
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
+        model="gemini-flash-latest",
         temperature=0,
         google_api_key=os.getenv("GOOGLE_API_KEY")
     ) 
@@ -70,19 +69,37 @@ def strategist_node(state: AgentState) -> Dict[str, Any]:
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", SYSTEM_PROMPT),
-        ("user", "Current Market Data:\nTechnical: {technical}\nMacro: {macro}\nRisk: {risk}\n\nAnalyst, what is your bias?")
+        ("user", "Market Data: {technical_indicators}")
     ])
     
     chain = prompt | llm | parser
     
-    response = chain.invoke({
-        "technical": state["technical_indicators"],
-        "macro": state["macro_sentiment"],
-        "risk": state["risk_environment"]
-    })
-    
-    # Map response to AgentState updates
-    return {
-        "current_bias": response["state"],
-        "reasoning_trace": [f"[Strategist]: {response['reasoning_trace']} (Confidence: {response['confidence_score']})"] 
-    }
+    try:
+        # Fix: Pass dictionary matching prompt variable
+        response = chain.invoke({"technical_indicators": state["technical_indicators"]})
+        
+        return {
+            "current_bias": response["state"],
+            "reasoning_trace": [f"[Strategist (Gemini)]: {response['reasoning_trace']} (Conf: {response['confidence_score']})"] 
+        }
+    except Exception as e:
+        # --- FALLBACK LOGIC ("The Lizard Brain") ---
+        # When AI fails/throttles, use robust mechanical logic
+        print(f"⚠️ AI Error ({str(e)[:50]}...): Switching to Fallback Logic.")
+        
+        tech = state.get("technical_indicators", {})
+        trend = tech.get("H1_Trend", "NEUTRAL")
+        price = tech.get("Current_Price", 1.0500)
+        
+        fallback_bias = "RISK_OFF"
+        if trend == "BULLISH":
+            fallback_bias = "BIAS_LONG"
+        elif trend == "BEARISH":
+            fallback_bias = "BIAS_SHORT"
+            
+        return {
+            "current_bias": fallback_bias,
+            "reasoning_trace": [f"[Strategist (Fallback)]: AI unavailable. Mechanical Bias: {fallback_bias}"],
+            # Ensure downstream nodes don't crash due to missing keys
+            "hard_levels": {"invalid_bias_level": price, "target_zone": price} 
+        }

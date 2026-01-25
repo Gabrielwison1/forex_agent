@@ -86,22 +86,36 @@ def app():
         db.close()
         
         if trades:
-            data = [{
-                "Time": t.timestamp.strftime("%H:%M:%S"),
-                "Action": t.action,
-                "Entry": t.entry_price,
-                "Lots": t.lot_size,
-                "P/L": f"${t.pnl}" if t.pnl else "OPEN"
-            } for t in trades]
-            st.dataframe(data, use_container_width=True)
+            # Filter trades for the Table (Show only real trades, hide WAITs)
+            real_trades = [t for t in trades if t.action in ["BUY", "SELL"]]
+            
+            if real_trades:
+                data = [{
+                    "Time": t.timestamp.strftime("%H:%M:%S"),
+                    "Action": t.action,
+                    "Entry": t.entry_price,
+                    "Lots": t.lot_size,
+                    "P/L": f"${t.pnl}" if t.pnl else "OPEN"
+                } for t in real_trades]
+                st.dataframe(data, use_container_width=True)
+            else:
+                st.info("No active positions.")
+                
+            # Show ALL logs (including WAIT) in the Thought Stream
+            latest_log = trades[0] # Get absolute latest activity
         else:
-            st.info("No trades yet. Waiting for opportunities...")
+            st.info("No activity recorded.")
+            latest_log = None
 
     with col_right:
         st.subheader("🧠 Thought Stream")
         
-        if trades and trades[0].reasoning_trace:
-            content = "\n\n".join(trades[0].reasoning_trace)
+        if latest_log and latest_log.reasoning_trace:
+            # Format nicely
+            ts = latest_log.timestamp.strftime("%H:%M:%S")
+            header = f"[{ts}] DECISION: {latest_log.action}"
+            trace = "\n > ".join(latest_log.reasoning_trace)
+            content = f"{header}\n\n > {trace}"
         else:
             content = "Waiting for AI reasoning..."
             

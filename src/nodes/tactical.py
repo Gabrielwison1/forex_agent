@@ -62,9 +62,13 @@ def tactical_node(state: AgentState) -> Dict[str, Any]:
     Executes the trade based on granular confirmation.
     """
     
-    # Initialize LLM
+    # Force reload
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+
+    # Initialize LLM (Stable Flash)
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
+        model="gemini-flash-latest",
         temperature=0,
         google_api_key=os.getenv("GOOGLE_API_KEY")
     ) 
@@ -78,22 +82,45 @@ def tactical_node(state: AgentState) -> Dict[str, Any]:
     
     chain = prompt | llm | parser
     
-    # Extract 5M data (mocked for now)
-    five_min_data = state.get("technical_indicators", {}).get("5M_Technicals", "No Data")
+    # Extract 5M data
+    technicals = state.get("technical_indicators", {})
+    five_min_data = technicals.get("5M_Technicals", "No Data")
+    current_price = technicals.get("Current_Price", 1.0500)
     
-    response = chain.invoke({
-        "bias": state.get("current_bias", "NEUTRAL"),
-        "structure": state.get("market_structure", "UNKNOWN"),
-        "data": five_min_data
-    })
-    
-    # Format the reasoning for the trace
-    trace_entry = f"[Tactical]: {response['decision']} - {response['reasoning']}"
-    if response['decision'] == "EXECUTE":
-        trace_entry += f" (Entry: {response['order_details']['entry_price']}, SL: {response['order_details']['stop_loss']})"
-    
-    return {
-        "trade_decision": response["decision"],
-        "order_details": response["order_details"],
-        "reasoning_trace": [trace_entry]
-    }
+    try:
+        response = chain.invoke({
+            "bias": state.get("current_bias", "NEUTRAL"),
+            "structure": state.get("market_structure", "UNKNOWN"),
+            "data": five_min_data
+        })
+        
+        # Format the reasoning for the trace
+        trace_entry = f"[Tactical (Gemini)]: {response['decision']} - {response['reasoning']}"
+        if response['decision'] == "EXECUTE":
+            trace_entry += f" (Entry: {response['order_details']['entry_price']}, SL: {response['order_details']['stop_loss']})"
+        
+        return {
+            "trade_decision": response["decision"],
+            "order_details": response["order_details"],
+            "reasoning_trace": [trace_entry]
+        }
+    except Exception as e:
+        print(f"⚠️ Tactical Error ({str(e)[:50]}...): Using Fallback.")
+        
+        # Fallback: Safe WAIT
+        fallback_decision = "WAIT"
+        trace_entry = f"[Tactical (Fallback)]: AI unavailable. Decision: {fallback_decision}"
+        
+        # Mock empty order details for safety
+        fallback_order = {
+            "action": "NONE",
+            "entry_price": current_price,
+            "stop_loss": current_price,
+            "take_profit": current_price
+        }
+        
+        return {
+            "trade_decision": fallback_decision,
+            "order_details": fallback_order,
+            "reasoning_trace": [trace_entry]
+        }

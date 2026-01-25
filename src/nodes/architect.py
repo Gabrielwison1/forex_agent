@@ -52,16 +52,19 @@ def architect_node(state: AgentState) -> Dict[str, Any]:
     Refines 1H Bias with 15M Structure.
     """
     
-    # Initialize LLM
+    # Force reload
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+
+    # Initialize LLM (Stable Flash)
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
+        model="gemini-flash-latest",
         temperature=0,
         google_api_key=os.getenv("GOOGLE_API_KEY")
     ) 
     
     parser = JsonOutputParser(pydantic_object=ArchitectOutput)
     
-    # Inject the Strategist's bias into the prompt
     prompt = ChatPromptTemplate.from_messages([
         ("system", SYSTEM_PROMPT),
         ("user", "Daily Bias: {bias}\n15M Data: {data}\n\nArchitect, define the structure.")
@@ -69,15 +72,24 @@ def architect_node(state: AgentState) -> Dict[str, Any]:
     
     chain = prompt | llm | parser
     
-    # We assume '15M_Technicals' is passed in the state inputs (mocked for now)
-    # In a real scenario, this comes from the raw data input
+    technicals = state.get("technical_indicators", {})
+    current_price = technicals.get("Current_Price", 1.0500)
     
-    response = chain.invoke({
-        "bias": state.get("current_bias", "NEUTRAL"),
-        "data": state.get("technical_indicators", {}).get("15M_Technicals", "No Data")
-    })
-    
-    return {
-        "market_structure": response["structure"],
-        "reasoning_trace": [f"[Architect]: {response['reasoning']} (Plan: {response['action_plan']})"]
-    }
+    try:
+        response = chain.invoke({
+            "bias": state.get("current_bias", "NEUTRAL"),
+            "data": technicals
+        })
+        
+        return {
+            "market_structure": response["structure"],
+            "reasoning_trace": [f"[Architect (Gemini)]: {response['reasoning']} (Plan: {response['action_plan']})"]
+        }
+    except Exception as e:
+        print(f"⚠️ Architect Error ({str(e)[:50]}...): Using Fallback.")
+        return {
+            "market_structure": "RANGING", # Safe default
+            "reasoning_trace": ["Architect (Fallback): AI unavailable. Treating as Ranging."],
+            # Need to pass key_zone for downstream Tactical node?
+            # Tactical probably looks at state['market_structure'], not key_zone directly yet
+        }
