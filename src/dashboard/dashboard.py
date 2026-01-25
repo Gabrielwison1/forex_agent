@@ -110,6 +110,22 @@ def app():
     with col_right:
         st.subheader("🧠 Thought Stream")
         
+        # --- HEARTBEAT MONITOR ---
+        from src.database.models import Heartbeat
+        db = SessionLocal()
+        last_hb = db.query(Heartbeat).order_by(Heartbeat.timestamp.desc()).first()
+        db.close()
+        
+        if last_hb:
+            status_color = "#4CAF50" if last_hb.status == "ACTIVE" else "#FF5252"
+            st.markdown(f"""
+            <div style="background-color: #1E1E1E; padding: 10px; border-radius: 5px; border-left: 5px solid {status_color}; margin-bottom: 20px;">
+                <b style="color: {status_color};">AGENT STATUS: {last_hb.status}</b><br>
+                <small style="color: #888;">Last Seen: {last_hb.timestamp.strftime('%H:%M:%S')}</small><br>
+                <small style="color: #666;">MSG: {last_hb.last_message}</small>
+            </div>
+            """, unsafe_allow_html=True)
+
         if latest_log and latest_log.reasoning_trace:
             # Format nicely
             ts = latest_log.timestamp.strftime("%H:%M:%S")

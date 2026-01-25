@@ -145,6 +145,17 @@ def main():
         
         while True:
             try:
+                # --- HEARTBEAT LOGGING ---
+                from src.database.models import Heartbeat, SessionLocal
+                try:
+                    db = SessionLocal()
+                    hb = Heartbeat(status="ACTIVE", last_message=f"Cycle starting for {pair}")
+                    db.add(hb)
+                    db.commit()
+                    db.close()
+                except Exception as db_err:
+                    print(f"Heartbeat Error: {db_err}")
+
                 run_agent_cycle()
                 print(f"\nNext check in {RUN_INTERVAL_MINUTES} minutes...")
                 time.sleep(RUN_INTERVAL_MINUTES * 60)
@@ -152,6 +163,14 @@ def main():
                 print("\n\nAgent stopped by user.")
                 break
             except Exception as e:
+                # Log crash to heartbeat
+                try:
+                    db = SessionLocal()
+                    hb = Heartbeat(status="CRASHED", last_message=str(e)[:200])
+                    db.add(hb)
+                    db.commit()
+                    db.close()
+                except: pass
                 print(f"\nError in main loop: {e}")
                 print("Retrying in 1 minute...")
                 time.sleep(60)

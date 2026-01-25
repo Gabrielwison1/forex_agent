@@ -9,6 +9,17 @@ load_dotenv()
 
 Base = declarative_base()
 
+class Heartbeat(Base):
+    """Heartbeat model for monitoring worker status."""
+    __tablename__ = 'heartbeats'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    status = Column(String(50), default="ALIVE")
+    last_message = Column(String(200), nullable=True)
+
+    def __repr__(self):
+        return f"<Heartbeat(id={self.id}, timestamp={self.timestamp}, status={self.status})>"
+
 class Trade(Base):
     """Trade model for storing executed trades."""
     __tablename__ = 'trades'
