@@ -105,11 +105,32 @@ def tactical_node(state: AgentState) -> Dict[str, Any]:
             "reasoning_trace": [trace_entry]
         }
     except Exception as e:
-        print(f"⚠️ Tactical Error ({str(e)[:50]}...): Using Fallback.")
+        error_msg = str(e)
+        
+        # Transient error retry
+        if "RESOURCE_EXHAUSTED" in error_msg or "429" in error_msg:
+            print(f"⚠️ Tactical Rate Limit: Waiting 10s for retry...")
+            import time
+            time.sleep(10)
+            try:
+                response = chain.invoke({
+                    "bias": state.get("current_bias", "NEUTRAL"),
+                    "structure": state.get("market_structure", "UNKNOWN"),
+                    "data": five_min_data
+                })
+                return {
+                    "trade_decision": response["decision"],
+                    "order_details": response["order_details"],
+                    "reasoning_trace": [f"[Tactical (Gemini - Retry)]: {response['decision']} - {response['reasoning']}"]
+                }
+            except Exception as retry_e:
+                error_msg = f"Retry Failed: {str(retry_e)}"
+
+        print(f"⚠️ Tactical AI Fallback: {error_msg[:100]}")
         
         # Fallback: Safe WAIT
         fallback_decision = "WAIT"
-        trace_entry = f"[Tactical (Fallback)]: AI unavailable. Decision: {fallback_decision}"
+        trace_entry = f"[Tactical (Fallback)]: AI Error: {error_msg[:50]}. Decision: {fallback_decision}"
         
         # Mock empty order details for safety
         fallback_order = {

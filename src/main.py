@@ -57,8 +57,21 @@ def run_agent_cycle():
     """Single execution cycle of the trading agent."""
     graph = create_graph()
     
+    # --- ADAPTIVE LEARNING: Self-Reflection ---
+    from src.nodes.evaluator import get_learning_context
+    learning_summary = "No learning data yet."
+    try:
+        print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Running self-reflection...")
+        learning_summary = get_learning_context()
+        print(f"  {learning_summary}")
+    except Exception as e:
+        print(f"  Self-reflection skipped: {e}")
+    
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Fetching live market data from OANDA...")
     initial_state = fetch_live_market_data()
+    
+    # Inject learning context into the state
+    initial_state["learning_context"] = learning_summary
     
     print("Running AI Analysis Chain...")
     
@@ -82,20 +95,28 @@ def run_agent_cycle():
                 print(f"  Order ID: {exec_result.get('order_id')}")
             else:
                 # --- PROFESSIONAL OBSERVABILITY UPGRADE ---
-                reason = result.get('execution_result', {}).get('reason', 'No setup found')
+                exec_res = result.get('execution_result', {})
+                risk_res = result.get('risk_assessment', {})
+                reason = exec_res.get('reason') or risk_res.get('rejection_reason') or 'Setup not met'
+                
                 print(f"✗ No trade: {reason}")
                 
+                # Log Architect's structure if available
+                structure = result.get('market_structure', 'UNKNOWN')
+                print(f"  Structure: {structure}")
+
                 # Save Reasoning to DB even if no trade
                 from src.database.models import Trade, SessionLocal
                 
                 try:
                     db = SessionLocal()
+                    hard_levels = result.get('hard_levels', {})
                     wait_log = Trade(
                         pair="EURUSD",
                         action="WAIT",
                         entry_price=initial_state["technical_indicators"]["Current_Price"],
-                        stop_loss=0.0,
-                        take_profit=0.0,
+                        stop_loss=hard_levels.get('invalid_bias_level', 0.0),
+                        take_profit=hard_levels.get('target_zone', 0.0),
                         lot_size=0.0,
                         status="NONE",
                         reasoning_trace=result.get("reasoning_trace", [])
@@ -103,7 +124,7 @@ def run_agent_cycle():
                     db.add(wait_log)
                     db.commit()
                     db.close()
-                    print("  (Reasoning saved to War Room)")
+                    print(f"  (Reasoning saved to War Room: {len(result.get('reasoning_trace', []))} steps)")
                 except Exception as e:
                     print(f"  (DB Log Error: {e})")
             

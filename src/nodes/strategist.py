@@ -40,6 +40,9 @@ You will receive calculated Technical Indicators (Lightweight Mode):
 2. **Setup Quality:** A setup is only Valid if D1 and H4 align (e.g., D1 Bullish + H4 Break of Structure Up).
 3. **Volatility:** If recent candles are excessively large (wicks > 3x body), market is too volatile.
 
+### LEARNING CONTEXT
+{learning_context}
+
 ### OUTPUT FORMAT
 You must respond ONLY in a valid JSON format:
 {{
@@ -75,17 +78,38 @@ def strategist_node(state: AgentState) -> Dict[str, Any]:
     chain = prompt | llm | parser
     
     try:
+        # Get learning context if available
+        learning_context = state.get("learning_context", "No recent performance data available.")
+        
         # Fix: Pass dictionary matching prompt variable
-        response = chain.invoke({"technical_indicators": state["technical_indicators"]})
+        response = chain.invoke({
+            "technical_indicators": state["technical_indicators"],
+            "learning_context": learning_context
+        })
         
         return {
             "current_bias": response["state"],
+            "hard_levels": response["hard_levels"],
             "reasoning_trace": [f"[Strategist (Gemini)]: {response['reasoning_trace']} (Conf: {response['confidence_score']})"] 
         }
     except Exception as e:
         # --- FALLBACK LOGIC ("The Lizard Brain") ---
-        # When AI fails/throttles, use robust mechanical logic
-        print(f"⚠️ AI Error ({str(e)[:50]}...): Switching to Fallback Logic.")
+        error_msg = str(e)
+        
+        # If it's a rate limit, we might want to wait and retry once before falling back
+        if "RESOURCE_EXHAUSTED" in error_msg or "429" in error_msg:
+             print(f"⚠️ Strategist Rate Limit: Waiting 10s for retry...")
+             time.sleep(10)
+             try:
+                 response = chain.invoke({"technical_indicators": state["technical_indicators"]})
+                 return {
+                    "current_bias": response["state"],
+                    "reasoning_trace": [f"[Strategist (Gemini - Retry)]: {response['reasoning_trace']}"] 
+                 }
+             except Exception as retry_e:
+                 error_msg = f"Retry Failed: {str(retry_e)}"
+
+        print(f"⚠️ Strategist AI Fallback: {error_msg[:100]}")
         
         tech = state.get("technical_indicators", {})
         trend = tech.get("H1_Trend", "NEUTRAL")
@@ -99,7 +123,6 @@ def strategist_node(state: AgentState) -> Dict[str, Any]:
             
         return {
             "current_bias": fallback_bias,
-            "reasoning_trace": [f"[Strategist (Fallback)]: AI unavailable. Mechanical Bias: {fallback_bias}"],
-            # Ensure downstream nodes don't crash due to missing keys
+            "reasoning_trace": [f"[Strategist (Fallback)]: AI Error: {error_msg[:50]}. Mechanical Bias: {fallback_bias}"],
             "hard_levels": {"invalid_bias_level": price, "target_zone": price} 
         }

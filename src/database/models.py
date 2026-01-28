@@ -42,13 +42,44 @@ class Trade(Base):
 
 # Database connection
 DATABASE_URL = os.getenv("DATABASE_URL")
-engine = create_engine(DATABASE_URL)
+
+def create_retrying_engine(url, max_retries=5, delay=3):
+    """Create an engine with retry logic for startup recovery."""
+    last_err = None
+    for i in range(max_retries):
+        try:
+            engine = create_engine(url)
+            # Test connection
+            with engine.connect() as conn:
+                return engine
+        except Exception as e:
+            last_err = e
+            if "starting up" in str(e).lower() or "connection refused" in str(e).lower():
+                print(f"  [DB] Database is starting up... (Attempt {i+1}/{max_retries})")
+                time.sleep(delay)
+            else:
+                raise e
+    raise last_err
+
+import time
+engine = create_retrying_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
-    """Initialize database tables."""
-    Base.metadata.create_all(bind=engine)
-    print("Database tables created successfully.")
+    """Initialize database tables with retry logic."""
+    max_retries = 3
+    for i in range(max_retries):
+        try:
+            Base.metadata.create_all(bind=engine)
+            print("Database tables created successfully.")
+            return
+        except Exception as e:
+            if "starting up" in str(e).lower() and i < max_retries - 1:
+                print(f"  [DB] System still starting up, retrying schema init... ({i+1}/{max_retries})")
+                time.sleep(5)
+            else:
+                print(f"Error initializing database schema: {e}")
+                raise e
 
 def get_db():
     """Get database session."""

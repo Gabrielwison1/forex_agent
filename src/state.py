@@ -14,6 +14,8 @@ class AgentState(TypedDict):
     # Decision States
     current_bias: str # "BIAS_LONG", "BIAS_SHORT", "RISK_OFF"
     market_structure: str # e.g. "TRENDING", "RANGING"
+    hard_levels: Dict[str, float] # Invalidation and Target levels from Strategist
+    learning_context: str # Performance summary from Evaluator
     
     # Reasoning Logs (Append-only)
     reasoning_trace: Annotated[List[str], operator.add]

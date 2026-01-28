@@ -86,10 +86,27 @@ def architect_node(state: AgentState) -> Dict[str, Any]:
             "reasoning_trace": [f"[Architect (Gemini)]: {response['reasoning']} (Plan: {response['action_plan']})"]
         }
     except Exception as e:
-        print(f"⚠️ Architect Error ({str(e)[:50]}...): Using Fallback.")
+        error_msg = str(e)
+        
+        # Transient error retry
+        if "RESOURCE_EXHAUSTED" in error_msg or "429" in error_msg:
+            print(f"⚠️ Architect Rate Limit: Waiting 10s for retry...")
+            import time
+            time.sleep(10)
+            try:
+                response = chain.invoke({
+                    "bias": state.get("current_bias", "NEUTRAL"),
+                    "data": technicals
+                })
+                return {
+                    "market_structure": response["structure"],
+                    "reasoning_trace": [f"[Architect (Gemini - Retry)]: {response['reasoning']}"]
+                }
+            except Exception as retry_e:
+                error_msg = f"Retry Failed: {str(retry_e)}"
+
+        print(f"⚠️ Architect AI Fallback: {error_msg[:100]}")
         return {
             "market_structure": "RANGING", # Safe default
-            "reasoning_trace": ["Architect (Fallback): AI unavailable. Treating as Ranging."],
-            # Need to pass key_zone for downstream Tactical node?
-            # Tactical probably looks at state['market_structure'], not key_zone directly yet
+            "reasoning_trace": [f"Architect (Fallback): AI Error: {error_msg[:50]}. Treating as Ranging."],
         }
