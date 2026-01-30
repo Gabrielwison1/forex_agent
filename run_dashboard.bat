@@ -10,16 +10,16 @@ set PYTHONPATH=.
 
 REM Check if venv python exists
 if exist ".venv\Scripts\python.exe" (
-    set START_CMD=.venv\Scripts\streamlit.exe
-    echo Using virutal environment Streamlit
+    set PYTHON_CMD=.venv\Scripts\python.exe
+    echo Using virtual environment Python
 ) else (
-    set START_CMD=streamlit
-    echo WARNING: Virtual environment not found, using system Streamlit
+    set PYTHON_CMD=python
+    echo WARNING: Virtual environment not found, using system Python
 )
 
-REM Run the dashboard
+REM Run the dashboard using python -m streamlit
 echo Starting Dashboard...
-%START_CMD% run src/dashboard/app.py
+%PYTHON_CMD% -m streamlit run src/dashboard/app.py
 
 if %errorlevel% neq 0 (
     echo.

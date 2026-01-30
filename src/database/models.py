@@ -70,8 +70,14 @@ def init_db():
     max_retries = 3
     for i in range(max_retries):
         try:
+            # create_all is idempotent - only creates if missing
             Base.metadata.create_all(bind=engine)
-            print("Database tables created successfully.")
+            # Only log on first successful call (not every check)
+            if i == 0:  # Only log if this was the first attempt
+                import os
+                # Suppress logging in dashboard refresh context
+                if not os.environ.get('STREAMLIT_RUNTIME_ENV'):
+                    print("Database tables created successfully.")
             return
         except Exception as e:
             if "starting up" in str(e).lower() and i < max_retries - 1:
