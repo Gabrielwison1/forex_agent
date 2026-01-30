@@ -79,7 +79,6 @@ def app():
         if st.button("💾 Save Broker Settings"):
             if new_key and new_id:
                 try:
-                    import os
                     env_file = os.path.join(os.getcwd(), '.env')
                     
                     # Update .env file
@@ -173,7 +172,6 @@ def get_pip_value(pair: str, lot_size: float = 1.0) -> float:
         if st.button("💾 Save AI Key"):
             if new_google_key:
                 try:
-                    import os
                     env_file = os.path.join(os.getcwd(), '.env')
                     set_key(env_file, 'GOOGLE_API_KEY', new_google_key)
                     st.success("✅ Google API Key updated in .env file! Restart agent to apply.")
