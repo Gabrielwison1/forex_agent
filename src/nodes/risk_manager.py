@@ -1,6 +1,8 @@
 from typing import Dict, Any
 from src.state import AgentState
 from src.config import risk_config
+from src.database.models import Trade, SessionLocal
+from datetime import datetime, timedelta
 
 def calculate_position_size(
     account_balance: float,
@@ -76,6 +78,51 @@ def risk_manager_node(state: AgentState) -> Dict[str, Any]:
     entry_price = order_details.get("entry_price", 0)
     stop_loss = order_details.get("stop_loss", 0)
     take_profit = order_details.get("take_profit", 0)
+    
+    # === NEW SAFETY CHECKS ===
+    
+    # Check 0: Max Open Positions
+    try:
+        db = SessionLocal()
+        open_positions = db.query(Trade).filter(Trade.status == "OPEN").count()
+        db.close()
+        
+        if open_positions >= risk_config.MAX_OPEN_POSITIONS:
+            return {
+                "risk_assessment": {
+                    "approved": False,
+                    "rejection_reason": f"Max open positions reached ({open_positions}/{risk_config.MAX_OPEN_POSITIONS})"
+                },
+                "reasoning_trace": [f"[Risk Manager]: REJECTED - Max positions limit reached"]
+            }
+    except Exception as e:
+        print(f"[Risk Manager] Warning: Could not check open positions: {e}")
+    
+    # Check 0.5: Daily Drawdown Limit
+    try:
+        db = SessionLocal()
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        today_trades = db.query(Trade).filter(
+            Trade.timestamp >= today_start,
+            Trade.pnl != None
+        ).all()
+        
+        daily_pnl = sum(t.pnl for t in today_trades)
+        db.close()
+        
+        max_loss = risk_config.ACCOUNT_BALANCE * risk_config.MAX_DAILY_DRAWDOWN
+        
+        if daily_pnl < -max_loss:
+            return {
+                "risk_assessment": {
+                    "approved": False,
+                    "rejection_reason": f"Daily drawdown limit hit: ${daily_pnl:.2f} (max: ${-max_loss:.2f})"
+                },
+                "reasoning_trace": [f"[Risk Manager]: REJECTED - Daily drawdown limit exceeded"]
+            }
+    except Exception as e:
+        print(f"[Risk Manager] Warning: Could not check daily drawdown: {e}")
     
     # Validation checks
     rejection_reason = None

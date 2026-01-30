@@ -7,6 +7,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Safety imports
+from src.safety.kill_switch import is_trading_enabled
+from src.safety.circuit_breaker import api_circuit_breaker
+from src.validation.data_validator import validator
+
 # Configuration
 RUN_INTERVAL_MINUTES = 15  # Increased to 15m to respect Gemini Free Tier limits
 RUN_ONCE = False  # Set to False for continuous loop
@@ -66,6 +71,16 @@ def run_agent_cycle():
         print(f"  {learning_summary}")
     except Exception as e:
         print(f"  Self-reflection skipped: {e}")
+    
+    # === KILL SWITCH CHECK ===
+    if not is_trading_enabled():
+        print("[KILL SWITCH] Trading is DISABLED. Skipping cycle.")
+        return False
+    
+    # === CIRCUIT BREAKER CHECK ===
+    if not api_circuit_breaker.can_attempt():
+        print(f"[CIRCUIT BREAKER] System halted. Status: {api_circuit_breaker.get_status()}")
+        return False
     
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Fetching live market data from OANDA...")
     initial_state = fetch_live_market_data()
@@ -128,11 +143,18 @@ def run_agent_cycle():
                 except Exception as e:
                     print(f"  (DB Log Error: {e})")
             
+            
+            # Record success for circuit breaker
+            api_circuit_breaker.record_success()
             return True # Success
             
             
         except Exception as e:
             error_str = str(e)
+            
+            # Record failure for circuit breaker
+            api_circuit_breaker.record_failure()
+            
             if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
                 print(f"(!) Rate Limit Hit (Attempt {attempt+1}/{max_retries}). Waiting {retry_delay}s...")
                 time.sleep(retry_delay)

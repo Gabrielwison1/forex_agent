@@ -38,6 +38,9 @@ Analyze the 15M structure.
 - `RANGING`: Price stuck between Swing High/Low. Trade boundaries.
 - `CHOPPY`: No clear structure. Recommend caution.
 
+### LEARNING CONTEXT
+{learning_context}
+
 ### JSON OUTPUT FORMAT
 {{
     "structure": "TRENDING" | "RANGING" | "CHOPPY",
@@ -77,9 +80,13 @@ def architect_node(state: AgentState) -> Dict[str, Any]:
     current_price = technicals.get("Current_Price", 1.0500)
     
     try:
+        # Get learning context
+        learning_context = state.get("learning_context", "No recent performance data available.")
+        
         response = chain.invoke({
             "bias": state.get("current_bias", "NEUTRAL"),
-            "data": technicals
+            "data": technicals,
+            "learning_context": learning_context
         })
         
         return {
@@ -97,7 +104,8 @@ def architect_node(state: AgentState) -> Dict[str, Any]:
             try:
                 response = chain.invoke({
                     "bias": state.get("current_bias", "NEUTRAL"),
-                    "data": technicals
+                    "data": technicals,
+                    "learning_context": learning_context
                 })
                 return {
                     "market_structure": response["structure"],
