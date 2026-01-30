@@ -90,7 +90,7 @@ def run_agent_cycle():
             
             if result.get('execution_result', {}).get('executed'):
                 exec_result = result['execution_result']
-                print(f"✓ TRADE EXECUTED: {exec_result.get('action')} "
+                print(f"[OK] TRADE EXECUTED: {exec_result.get('action')} "
                       f"{exec_result.get('lot_size')} lots @ {exec_result.get('entry_price')}")
                 print(f"  Order ID: {exec_result.get('order_id')}")
             else:
@@ -99,7 +99,7 @@ def run_agent_cycle():
                 risk_res = result.get('risk_assessment', {})
                 reason = exec_res.get('reason') or risk_res.get('rejection_reason') or 'Setup not met'
                 
-                print(f"✗ No trade: {reason}")
+                print(f"[X] No trade: {reason}")
                 
                 # Log Architect's structure if available
                 structure = result.get('market_structure', 'UNKNOWN')
@@ -134,7 +134,7 @@ def run_agent_cycle():
         except Exception as e:
             error_str = str(e)
             if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
-                print(f"⚠️ Rate Limit Hit (Attempt {attempt+1}/{max_retries}). Waiting {retry_delay}s...")
+                print(f"(!) Rate Limit Hit (Attempt {attempt+1}/{max_retries}). Waiting {retry_delay}s...")
                 time.sleep(retry_delay)
                 retry_delay *= 2 # Exponential backoff
             else:

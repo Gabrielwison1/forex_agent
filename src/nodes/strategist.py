@@ -102,7 +102,10 @@ def strategist_node(state: AgentState) -> Dict[str, Any]:
              print(f"⚠️ Strategist Rate Limit: Waiting 10s for retry...")
              time.sleep(10)
              try:
-                 response = chain.invoke({"technical_indicators": state["technical_indicators"]})
+                 response = chain.invoke({
+                    "technical_indicators": state["technical_indicators"],
+                    "learning_context": learning_context
+                 })
                  return {
                     "current_bias": response["state"],
                     "reasoning_trace": [f"[Strategist (Gemini - Retry)]: {response['reasoning_trace']}"] 
