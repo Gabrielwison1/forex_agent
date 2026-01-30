@@ -23,10 +23,22 @@ def fetch_live_market_data():
     # Fetch current price
     price = client.get_current_price("EUR_USD")
     
+    # === DATA VALIDATION ===
+    is_valid, message = validator.validate_price(price)
+    if not is_valid:
+        print(f"[DATA VALIDATION] {message}")
+        raise ValueError(f"Invalid price data: {message}")
+    
     # --- LIGHTWEIGHT MODE (Rate Limit Safe) ---
     # Fetch just enough for calculation
     h1_candles = client.get_candles("EUR_USD", granularity="H1", count=20)
     m15_candles = client.get_candles("EUR_USD", granularity="M15", count=20)
+    
+    # Validate candle data
+    is_valid, message = validator.validate_candles(h1_candles)
+    if not is_valid:
+        print(f"[DATA VALIDATION] {message}")
+        raise ValueError(f"Invalid candle data: {message}")
     
     # Calculate simple indicators locally to save tokens
     h1_closes = [c['close'] for c in h1_candles]
