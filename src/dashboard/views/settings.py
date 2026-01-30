@@ -71,21 +71,26 @@ def app():
     """)
     
     with st.expander("🔧 Update OANDA Credentials"):
-        new_key = st.text_input("OANDA API Key", value="", type="password", help="Your personal access token")
-        new_id = st.text_input("Account ID", value="", placeholder=current_id)
+        new_key = st.text_input("OANDA API Key", value="", type="password", help="Your personal access token", key="oanda_key_input")
+        new_id = st.text_input("Account ID", value="", placeholder=current_id, key="oanda_id_input")
         
-        env_type = st.radio("Environment", ["Demo (Practice)", "Live (Real Money)"], index=0)
+        env_type = st.radio("Environment", ["Demo (Practice)", "Live (Real Money)"], index=0, key="oanda_env")
         
         if st.button("💾 Save Broker Settings"):
             if new_key and new_id:
                 try:
-                    set_key('.env', 'OANDA_API_KEY', new_key)
-                    set_key('.env', 'OANDA_ACCOUNT_ID', new_id)
+                    import os
+                    env_file = os.path.join(os.getcwd(), '.env')
+                    
+                    # Update .env file
+                    set_key(env_file, 'OANDA_API_KEY', new_key)
+                    set_key(env_file, 'OANDA_ACCOUNT_ID', new_id)
                     
                     new_url = "https://api-fxpractice.oanda.com" if "Demo" in env_type else "https://api-fxtrade.oanda.com"
-                    set_key('.env', 'OANDA_URL', new_url)
+                    set_key(env_file, 'OANDA_URL', new_url)
                     
-                    st.success("✅ Configuration saved! Restart the agent to apply changes.")
+                    st.success("✅ OANDA credentials saved to .env file! Restart the agent to apply changes.")
+                    st.info("💡 Run this command to restart: Close all windows and run START_ALL.bat")
                 except Exception as e:
                     st.error(f"Error saving settings: {e}")
             else:
@@ -163,13 +168,16 @@ def get_pip_value(pair: str, lot_size: float = 1.0) -> float:
     st.markdown(f"**Current API Key:** `{masked_google}`")
     
     with st.expander("🔧 Update Google AI Key"):
-        new_google_key = st.text_input("Google API Key", value="", type="password", help="From ai.google.dev")
+        new_google_key = st.text_input("Google API Key", value="", type="password", help="From ai.google.dev", key="google_key_input")
         
         if st.button("💾 Save AI Key"):
             if new_google_key:
                 try:
-                    set_key('.env', 'GOOGLE_API_KEY', new_google_key)
-                    st.success("✅ Google API Key updated! Restart agent to apply.")
+                    import os
+                    env_file = os.path.join(os.getcwd(), '.env')
+                    set_key(env_file, 'GOOGLE_API_KEY', new_google_key)
+                    st.success("✅ Google API Key updated in .env file! Restart agent to apply.")
+                    st.info("💡 Run this command to restart: Close all windows and run START_ALL.bat")
                 except Exception as e:
                     st.error(f"Error: {e}")
             else:
