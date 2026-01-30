@@ -255,16 +255,19 @@ def app():
             if time_diff < 120:  # Less than 2 minutes
                 status_color = "#4CAF50"
                 status_text = "ACTIVE"
+                status_emoji = "🟢"
             elif time_diff < 600:  # Less than 10 minutes
                 status_color = "#FFC107"
                 status_text = "IDLE"
+                status_emoji = "🟡"
             else:
                 status_color = "#FF5252"
                 status_text = "OFFLINE"
+                status_emoji = "🔴"
             
             st.markdown(f"""
             <div style="background: linear-gradient(135deg, #1E1E1E 0%, #2A2A2A 100%); padding: 15px; border-radius: 8px; border-left: 5px solid {status_color}; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                <b style="color: {status_color}; font-size: 16px;">🔸 AGENT: {status_text}</b><br>
+                <b style="color: {status_color}; font-size: 16px;">{status_emoji} AGENT: {status_text}</b><br>
                 <small style="color: #888;">Last Heartbeat: {last_hb.timestamp.strftime('%H:%M:%S')} ({int(time_diff)}s ago)</small><br>
                 <small style="color: #666;">Message: {last_hb.last_message or 'No message'}</small>
             </div>
