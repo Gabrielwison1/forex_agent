@@ -75,7 +75,7 @@ def app():
             hovermode='x unified'
         )
         
-        st.plotly_chart(fig_equity, width='stretch')
+        st.plotly_chart(fig_equity, use_container_width=True)
         
         st.markdown("---")
         
@@ -103,7 +103,7 @@ def app():
                     showlegend=False
                 )
                 
-                st.plotly_chart(fig_pnl, width='stretch')
+                st.plotly_chart(fig_pnl, use_container_width=True)
             else:
                 st.info("No closed trades yet")
         
@@ -124,7 +124,7 @@ def app():
                     showlegend=True
                 )
                 
-                st.plotly_chart(fig_pie, width='stretch')
+                st.plotly_chart(fig_pie, use_container_width=True)
             else:
                 st.info("No closed trades yet")
         
@@ -171,7 +171,7 @@ def app():
                 })
             
             df_trades = pd.DataFrame(trade_data)
-            st.dataframe(df_trades, width='stretch', height=400)
+            st.dataframe(df_trades, use_container_width=True, height=400)
             
             # Export button
             csv = df_trades.to_csv(index=False)
@@ -221,7 +221,7 @@ def app():
             showlegend=False
         )
         
-        st.plotly_chart(fig_hb, width='stretch')
+        st.plotly_chart(fig_hb, use_container_width=True)
         
         # Recent heartbeats
         st.markdown("**Recent Heartbeats:**")
@@ -244,7 +244,7 @@ def app():
                 raw_data.append({k: v for k, v in t.__dict__.items() if not k.startswith('_')})
             
             df_raw = pd.DataFrame(raw_data)
-            st.dataframe(df_raw, width='stretch', height=300)
+            st.dataframe(df_raw, use_container_width=True, height=300)
         else:
             st.info("Trade table is empty")
     
@@ -261,6 +261,6 @@ def app():
                 db = SessionLocal()
                 result = pd.read_sql(query, db.bind)
                 db.close()
-                st.dataframe(result, width='stretch')
+                st.dataframe(result, use_container_width=True)
             except Exception as e:
                 st.error(f"Query error: {e}")

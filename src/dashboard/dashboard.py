@@ -200,7 +200,7 @@ def app():
                     })
                 
                 df = pd.DataFrame(data)
-                st.dataframe(df, width='stretch', height=300)
+                st.dataframe(df, use_container_width=True, height=300)
             else:
                 st.info("No trades executed yet. Agent is analyzing market...")
         else:
