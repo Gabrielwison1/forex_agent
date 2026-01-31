@@ -221,12 +221,14 @@ def app():
         for hb in heartbeats[:5]:
             ts = hb.timestamp.strftime("%H:%M:%S")
             msg = hb.last_message or "No message"
-            if "CRASHED" in msg or "Error" in msg:
+            msg_lower = msg.lower()
+            
+            if "crashed" in msg_lower or "error" in msg_lower or "invalid" in msg_lower or "failed" in msg_lower:
                 icon = "🔴"
-            elif "Cycle starting" in msg:
+            elif "cycle starting" in msg_lower:
                  icon = "🟢"
             else:
-                 icon = "🟢"
+                 icon = "⚪"  # Grey for neutral/info messages
                  
             st.markdown(f"{icon} **{ts}** - {msg}")
     else:
