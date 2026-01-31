@@ -256,7 +256,7 @@ def app():
                 status_color = "#4CAF50"
                 status_text = "ACTIVE"
                 status_emoji = "🟢"
-            elif time_diff < 600:  # Less than 10 minutes
+            elif time_diff < 1200:  # Less than 20 minutes (15min cycle + 5min buffer)
                 status_color = "#FFC107"
                 status_text = "IDLE"
                 status_emoji = "🟡"
